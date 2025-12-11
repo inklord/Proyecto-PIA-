@@ -1,0 +1,30 @@
+bin/
+obj/
+
+.vs/
+*.user
+*.suo
+*.userprefs
+
+*.log
+*.tmp
+
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Environment Variables (Secrets)
+.env
+*.env
+
+# VS Code
+.vscode/
+
+# MacOS
+.DS_Store

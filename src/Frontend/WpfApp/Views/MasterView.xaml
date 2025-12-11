@@ -1,0 +1,61 @@
+<Page x:Class="WpfApp.Views.MasterView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Explora" Background="{StaticResource MainBackgroundBrush}">
+    
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Cabecera de la vista -->
+        <Grid Margin="0,0,0,20">
+            <TextBlock Text="Explora Géneros" FontSize="28" FontWeight="Light" Foreground="{StaticResource TextPrimaryBrush}"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Recargar Datos" Click="BtnReload_Click" Style="{StaticResource PrimaryButton}" Width="120"/>
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="GenusItems">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel IsItemsHost="True" HorizontalAlignment="Center"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- Tarjeta estilo iNaturalist -->
+                        <Border Background="White" Margin="10" CornerRadius="3" Width="220" Height="280"
+                                Cursor="Hand" MouseLeftButtonUp="GenusCard_Click">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Direction="270" Color="#DDDDDD" Opacity="0.5"/>
+                            </Border.Effect>
+                            
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="180"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Imagen -->
+                                <Border CornerRadius="3,3,0,0" ClipToBounds="True">
+                                    <Image Source="{Binding RepresentativePhotoUrl}" Stretch="UniformToFill"/>
+                                </Border>
+                                
+                                <!-- Info -->
+                                <StackPanel Grid.Row="1" Margin="15,10">
+                                    <TextBlock Text="{Binding Genus}" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding Species.Count, StringFormat='{}{0} especies'}"
+                                               FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</Page>

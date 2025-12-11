@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiApp.Views.MasterPage"
+             Title="Especies de Hormigas">
+    <Grid RowDefinitions="Auto,*">
+        <Button Text="Recargar Especies" Clicked="BtnLoad_Clicked" Margin="10" />
+        
+        <CollectionView x:Name="CollView" Grid.Row="1">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Frame Margin="10" Padding="10" BorderColor="Gray" CornerRadius="5">
+                        <Grid ColumnDefinitions="80, *" ColumnSpacing="10">
+                            <!-- Imagen con Fallback si no hay URL -->
+                            <Image Grid.Column="0" 
+                                   Source="{Binding PhotoUrl}" 
+                                   Aspect="AspectFill" 
+                                   HeightRequest="80" 
+                                   WidthRequest="80"
+                                   BackgroundColor="LightGray"/>
+                            
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                <Label Text="{Binding ScientificName}" FontAttributes="Bold" FontSize="18" />
+                                <Label Text="{Binding AntWikiUrl}" FontSize="Micro" TextColor="Blue" LineBreakMode="TailTruncation" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

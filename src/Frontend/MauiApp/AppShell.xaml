@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="MauiApp.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:MauiApp"
+    xmlns:views="clr-namespace:MauiApp.Views"
+    Shell.FlyoutBehavior="Flyout">
+
+    <ShellContent
+        Title="Login"
+        ContentTemplate="{DataTemplate views:LoginPage}"
+        Route="LoginPage" />
+
+    <FlyoutItem Title="Catálogo Hormigas">
+        <ShellContent ContentTemplate="{DataTemplate views:MasterPage}" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Mirmecólogo IA">
+        <ShellContent ContentTemplate="{DataTemplate views:McpPage}" />
+    </FlyoutItem>
+
+</Shell>
