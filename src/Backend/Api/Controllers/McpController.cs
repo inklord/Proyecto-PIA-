@@ -297,17 +297,6 @@ Si no estás seguro de algo, dilo explícitamente y sugiere al usuario que consu
                 return StatusCode(500, new { error = $"Excepción interna al llamar a OpenAI: {ex.Message}" });
             }
         }
-    }
-
-    public class McpQueryRequest
-    {
-        public string Query { get; set; } = string.Empty;
-        // Opcionalmente se podría enviar el nombre de la especie actual o una lista de IDs,
-        // para mejorar el contexto del asistente en futuras ampliaciones.
-        public string? SpeciesName { get; set; }
-        public List<int>? SpeciesIds { get; set; }
-    }
-
         /// <summary>
         /// Calcula la distancia de Levenshtein entre dos cadenas (medida clásica de "parecido" entre textos).
         /// </summary>
@@ -336,4 +325,14 @@ Si no estás seguro de algo, dilo explícitamente y sugiere al usuario que consu
 
             return d[n, m];
         }
+    }
+
+    public class McpQueryRequest
+    {
+        public string Query { get; set; } = string.Empty;
+        // Opcionalmente se podría enviar el nombre de la especie actual o una lista de IDs,
+        // para mejorar el contexto del asistente en futuras ampliaciones.
+        public string? SpeciesName { get; set; }
+        public List<int>? SpeciesIds { get; set; }
+    }
 }
