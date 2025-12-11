@@ -28,12 +28,12 @@ Este repositorio corresponde al proyecto PIA de la asignatura, preparado para se
 2. Ejecuta el proyecto. Se abrirá una consola o navegador en `http://localhost:5000` (o puerto aleatorio, verifica la consola).
 3. **Importante:** Anota la URL base si es diferente a `http://localhost:5000`.
 
-### Paso 2: Cargar Datos (Consola)
-1. Abre `src/Frontend/ConsoleApp`.
-2. Verifica el archivo `App.config`: asegúrate de que `CsvPath` apunta a tu fichero `sp500_2025_h1_wide_clean.csv`.
+### Paso 2: Cliente de Consola (carga de datos de ejemplo)
+1. Abre el proyecto `src/Frontend/ConsoleApp/ConsoleApp.csproj`.
+2. Opcional: si tu API no está en `http://localhost:5000/api`, ajusta la constante `BaseUrl` en `ApiClient.cs`.
 3. Ejecuta la aplicación.
 4. Login con: `admin` / `admin`.
-5. Selecciona la opción **1** para cargar los datos del CSV a la API.
+5. Selecciona la opción **1** para cargar en la API un pequeño conjunto de especies de hormigas de ejemplo (simulación de un CSV de Kaggle).
 
 ### Paso 3: Cliente WPF
 1. Abre `src/Frontend/WpfApp`.
