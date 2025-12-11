@@ -1,14 +1,21 @@
-# Proyecto Final EV1 - Sistema Distribuido .NET
+## Proyecto PIA - Sistema Distribuido .NET con IA
 
-Este proyecto integra una API REST, persistencia dual (MySQL/Memoria), integración con IA (Protocolo MCP) y tres clientes front-end (Consola, WPF, MAUI).
+Solución completa en .NET 8 que integra:
+- **API REST** para gestión de especies de hormigas y autenticación JWT.
+- **Persistencia intercambiable** (Memoria / MySQL).
+- **Clientes front-end**: consola, WPF de escritorio y MAUI multiplataforma.
+- **Integración con IA (OpenAI/MCP)** para consultas avanzadas sobre los datos.
 
-## Estructura
-- **src/Backend/Api**: Servidor REST (ASP.NET Core 8).
-- **src/Backend/Persistence**: Lógica de acceso a datos y Repositorios.
-- **src/Shared/Models**: Entidades compartidas.
-- **src/Frontend/ConsoleApp**: Cliente de carga de datos y pruebas.
-- **src/Frontend/WpfApp**: Interfaz de escritorio Windows (MDI).
-- **src/Frontend/MauiApp**: Interfaz multiplataforma (Móvil).
+Este repositorio corresponde al proyecto PIA de la asignatura, preparado para ser clonado y ejecutado en Visual Studio 2022.
+
+## Estructura de la solución
+- `src/Backend/Api`: API REST (ASP.NET Core 8).
+- `src/Backend/Persistence`: lógica de acceso a datos, factoría de repositorios y repositorios SQL/Memoria.
+- `src/Shared/Models`: modelos compartidos (`AntSpecies`, `User`, DTOs de autenticación, etc.).
+- `src/Frontend/ConsoleApp`: cliente de consola para login y carga de datos desde CSV.
+- `src/Frontend/WpfApp`: cliente WPF de escritorio con vistas maestro-detalle y chat IA.
+- `src/Frontend/MauiApp`: app MAUI (Android/Windows) con login y chat IA.
+- `init_users.sql`: script para crear usuarios iniciales en MySQL (si se usa persistencia SQL).
 
 ## Instrucciones de Ejecución
 
