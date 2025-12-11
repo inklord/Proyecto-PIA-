@@ -206,9 +206,11 @@ Si no estás seguro de algo, dilo explícitamente y sugiere al usuario que consu
                 using var doc = JsonDocument.Parse(responseString);
                 var answer = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
 
-                // Detectar especies mencionadas en la PREGUNTA del usuario (priorizando coincidencia exacta)
+                // Detectar especies mencionadas en la PREGUNTA del usuario (priorizando coincidencia exacta
+                // y, si no existe, la especie científicamente más cercana al texto introducido).
                 var lowerQuery = userQuery.ToLower();
-                var matchedSpecies = allSpecies
+
+                var candidateQuerySpecies = allSpecies
                     .Where(s => !string.IsNullOrWhiteSpace(s.ScientificName))
                     .Where(s => !string.IsNullOrWhiteSpace(s.PhotoUrl))
                     .Select(s => new
@@ -218,11 +220,59 @@ Si no estás seguro de algo, dilo explícitamente y sugiere al usuario que consu
                         GenusLower = s.ScientificName.Split(' ')[0].ToLower()
                     })
                     .Where(x => lowerQuery.Contains(x.NameLower) || lowerQuery.Contains(x.GenusLower))
-                    .OrderByDescending(x => lowerQuery.Contains(x.NameLower)) // Prioridad 1: Nombre completo en la query
-                    .ThenByDescending(x => x.NameLower.Length) // Prioridad 2: Nombres más largos (más específicos)
-                    .Select(x => x.Species)
-                    .Take(5)
                     .ToList();
+
+                List<Models.AntSpecies> matchedSpecies = new();
+
+                if (candidateQuerySpecies.Any())
+                {
+                    // 1) Si el usuario ha escrito EXACTAMENTE el nombre científico, priorizamos esas coincidencias.
+                    var exactMatches = candidateQuerySpecies
+                        .Where(x => lowerQuery.Contains(x.NameLower))
+                        .OrderByDescending(x => x.NameLower.Length)
+                        .Select(x => x.Species)
+                        .ToList();
+
+                    if (exactMatches.Any())
+                    {
+                        matchedSpecies = exactMatches.Take(5).ToList();
+                    }
+                    else
+                    {
+                        // 2) Si solo coincide el género, usamos una métrica de similitud (distancia de Levenshtein)
+                        //    entre el texto que escribió el usuario y el nombre científico completo para elegir
+                        //    la especie "más parecida" a la petición.
+
+                        // Intentamos extraer de la pregunta la parte que parece "nombre de especie":
+                        // buscamos el primer género mencionado y tomamos ese término + la siguiente palabra.
+                        string requestedName = lowerQuery;
+                        var firstGenus = candidateQuerySpecies.Select(x => x.GenusLower).FirstOrDefault(g => lowerQuery.Contains(g));
+                        if (!string.IsNullOrWhiteSpace(firstGenus))
+                        {
+                            var idx = lowerQuery.IndexOf(firstGenus, StringComparison.Ordinal);
+                            if (idx >= 0)
+                            {
+                                var tail = lowerQuery[idx..];
+                                var stopChars = new[] { '.', '?', '!', '\n' };
+                                var stopIdx = tail.IndexOfAny(stopChars);
+                                if (stopIdx >= 0) tail = tail[..stopIdx];
+
+                                var words = tail.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                                if (words.Length >= 2)
+                                    requestedName = $"{words[0]} {words[1]}";
+                                else
+                                    requestedName = words[0];
+                            }
+                        }
+
+                        matchedSpecies = candidateQuerySpecies
+                            .OrderBy(x => ComputeLevenshteinDistance(requestedName, x.NameLower))
+                            .ThenByDescending(x => x.NameLower.Length)
+                            .Select(x => x.Species)
+                            .Take(5)
+                            .ToList();
+                    }
+                }
 
                 // Si el usuario pregunta por species para empezar / principiantes y no hemos detectado ninguna,
                 // seleccionamos algunas especies recomendadas conocidas con foto.
@@ -257,4 +307,33 @@ Si no estás seguro de algo, dilo explícitamente y sugiere al usuario que consu
         public string? SpeciesName { get; set; }
         public List<int>? SpeciesIds { get; set; }
     }
+
+        /// <summary>
+        /// Calcula la distancia de Levenshtein entre dos cadenas (medida clásica de "parecido" entre textos).
+        /// </summary>
+        private static int ComputeLevenshteinDistance(string source, string target)
+        {
+            if (string.IsNullOrEmpty(source)) return string.IsNullOrEmpty(target) ? 0 : target.Length;
+            if (string.IsNullOrEmpty(target)) return source.Length;
+
+            var n = source.Length;
+            var m = target.Length;
+            var d = new int[n + 1, m + 1];
+
+            for (var i = 0; i <= n; i++) d[i, 0] = i;
+            for (var j = 0; j <= m; j++) d[0, j] = j;
+
+            for (var i = 1; i <= n; i++)
+            {
+                for (var j = 1; j <= m; j++)
+                {
+                    var cost = source[i - 1] == target[j - 1] ? 0 : 1;
+                    d[i, j] = Math.Min(
+                        Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                        d[i - 1, j - 1] + cost);
+                }
+            }
+
+            return d[n, m];
+        }
 }
