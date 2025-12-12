@@ -1,6 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Persistence;
 using System.Net.Http.Headers;
 
@@ -10,7 +11,8 @@ namespace Api.Services
     {
         private static readonly JsonSerializerOptions RpcJsonOptions = new JsonSerializerOptions
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
         private readonly IRepository<Models.AntSpecies> _repository;

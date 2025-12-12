@@ -191,9 +191,13 @@ namespace MauiApp.Services
 
                 if (id != null && _pendingRequests.TryRemove(id, out var tcs))
                 {
-                    if (root.TryGetProperty("error", out var errProp) || root.TryGetProperty("Error", out errProp))
+                    if ((root.TryGetProperty("error", out var errProp) || root.TryGetProperty("Error", out errProp))
+                        && errProp.ValueKind != JsonValueKind.Null
+                        && errProp.ValueKind != JsonValueKind.Undefined)
                     {
-                         var errMsg = errProp.GetProperty("message").GetString();
+                         var errMsg = errProp.TryGetProperty("message", out var msgProp) || errProp.TryGetProperty("Message", out msgProp)
+                             ? msgProp.GetString()
+                             : "Error desconocido";
                          tcs.SetResult(new McpResult { Answer = $"Error del Servidor: {errMsg}" });
                     }
                     else if (root.TryGetProperty("result", out var resProp) || root.TryGetProperty("Result", out resProp))
