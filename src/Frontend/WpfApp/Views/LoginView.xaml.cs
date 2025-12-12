@@ -18,8 +18,11 @@ namespace WpfApp.Views
             bool success = await MainWindow.ApiClient.LoginAsync(email, pass);
             if (success)
             {
-                MessageBox.Show("Login Correcto");
-                NavigationService.Navigate(new MasterView());
+                // Acceder a la ventana principal para actualizar menú
+                if (Application.Current.MainWindow is MainWindow mw)
+                {
+                    mw.OnLoginSuccess();
+                }
             }
             else
             {

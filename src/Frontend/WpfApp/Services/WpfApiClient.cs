@@ -17,6 +17,19 @@ namespace WpfApp.Services
     {
         private readonly HttpClient _client;
         private string _token = string.Empty;
+
+        public string? Token
+        {
+            get => _token;
+            set
+            {
+                _token = value ?? string.Empty;
+                if (string.IsNullOrEmpty(_token))
+                    _client.DefaultRequestHeaders.Authorization = null;
+                else
+                    _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            }
+        }
         // Cambia localhost:5000 por tu puerto real si es diferente
         private const string BaseUrl = "http://localhost:5000/api";
         private const string WsUrl = "ws://localhost:5000/mcp"; 

@@ -23,10 +23,10 @@
 
                 <!-- Menu Links -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="Explora" Click="Nav_Master" Margin="5" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" Foreground="#555555"/>
-                    <Button Content="Comunidad (IA)" Click="Nav_Mcp" Margin="5" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" Foreground="#555555"/>
-                    <Button Content="Ingresar" Click="Nav_Login" Style="{StaticResource PrimaryButton}" Margin="15,0,0,0" Width="80"/>
-                    <Button Content="Salir" Click="Exit_Click" Margin="5" Background="Transparent" BorderThickness="0" FontSize="11" Foreground="Gray"/>
+                    <Button x:Name="BtnExplora" Content="Explora" Click="Nav_Master" Margin="5" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" Foreground="#555555" Visibility="Collapsed"/>
+                    <Button x:Name="BtnComunidad" Content="Comunidad (IA)" Click="Nav_Mcp" Margin="5" Background="Transparent" BorderThickness="0" FontWeight="SemiBold" Foreground="#555555" Visibility="Collapsed"/>
+                    <Button x:Name="BtnIngresar" Content="Ingresar" Click="Nav_Login" Style="{StaticResource PrimaryButton}" Margin="15,0,0,0" Width="80"/>
+                    <Button x:Name="BtnSalir" Content="Salir" Click="Exit_Click" Margin="5" Background="Transparent" BorderThickness="0" FontSize="11" Foreground="Gray" Visibility="Collapsed"/>
                 </StackPanel>
             </Grid>
         </Border>

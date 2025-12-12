@@ -16,10 +16,36 @@ namespace WpfApp
             MainFrame.Navigate(new LoginView());
         }
 
-        private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+        public void OnLoginSuccess()
+        {
+            BtnExplora.Visibility = Visibility.Visible;
+            BtnComunidad.Visibility = Visibility.Visible;
+            BtnSalir.Visibility = Visibility.Visible;
+            BtnIngresar.Visibility = Visibility.Collapsed;
+            
+            // Navegar a la vista principal
+            MainFrame.Navigate(new MasterView());
+        }
+
+        private void Logout()
+        {
+            ApiClient.Token = null; // Borrar token si hubiera
+            BtnExplora.Visibility = Visibility.Collapsed;
+            BtnComunidad.Visibility = Visibility.Collapsed;
+            BtnSalir.Visibility = Visibility.Collapsed;
+            BtnIngresar.Visibility = Visibility.Visible;
+            
+            MainFrame.Navigate(new LoginView());
+        }
+
+        private void Exit_Click(object sender, RoutedEventArgs e) => Logout();
         private void Nav_Login(object sender, RoutedEventArgs e) => MainFrame.Navigate(new LoginView());
         private void Nav_Master(object sender, RoutedEventArgs e) => MainFrame.Navigate(new MasterView());
         private void Nav_Mcp(object sender, RoutedEventArgs e) => MainFrame.Navigate(new McpView());
-        private void Logo_Click(object sender, MouseButtonEventArgs e) => MainFrame.Navigate(new MasterView());
+        private void Logo_Click(object sender, MouseButtonEventArgs e)
+        {
+             if (BtnExplora.Visibility == Visibility.Visible)
+                MainFrame.Navigate(new MasterView());
+        }
     }
 }
