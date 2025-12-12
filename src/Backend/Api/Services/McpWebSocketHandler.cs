@@ -224,7 +224,7 @@ namespace Api.Services
                     }
 
                     // Sugerencias por similitud
-                    var suggestionsOnly = FindSimilarSpecies(requestedOnly, data, threshold: 60).Take(5).ToList();
+                    var suggestionsOnly = FindSimilarSpecies(requestedOnly, data, threshold: 70).Take(5).ToList();
                     if (suggestionsOnly.Any())
                     {
                         // Si la primera es muy alta, asumimos corrección automática y consultamos a OpenAI sobre esa especie.
@@ -274,7 +274,7 @@ namespace Api.Services
                 var requested = ExtractPossibleSpeciesName(userQuery);
                 if (!string.IsNullOrWhiteSpace(requested))
                 {
-                    var suggestions = FindSimilarSpecies(requested, data, threshold: 60).Take(5).ToList();
+                    var suggestions = FindSimilarSpecies(requested, data, threshold: 70).Take(5).ToList();
                     if (suggestions.Any())
                     {
                         var lines = suggestions.Select(s => $"- {s.Species.ScientificName} ({s.Similarity:0.0}%)");
@@ -348,7 +348,7 @@ namespace Api.Services
             var requested = ExtractPossibleSpeciesName(query);
             if (!string.IsNullOrWhiteSpace(requested))
             {
-                return FindSimilarSpecies(requested, all, threshold: 55)
+                return FindSimilarSpecies(requested, all, threshold: 70)
                     .Take(5)
                     .Select(x => x.Species)
                     .ToList();
