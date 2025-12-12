@@ -204,10 +204,14 @@ namespace Api.Services
             var data = (await _repository.GetAllAsync()).ToList();
 
             // 0) Peticiones directas
-            if (query.Contains("muestrame") || query.Contains("muéstrame") || query.Contains("enseñame"))
+            if (query.Contains("muestrame") || query.Contains("muéstrame") || query.Contains("enseñame") || query.Contains("enséñame")
+                || query.Contains("mostrar") || query.Contains("ver ") || query.Contains("busca") || query.Contains("buscar"))
             {
-                // Lógica simplificada de coincidencia exacta para este ejemplo
-                var exact = data.FirstOrDefault(s => query.Contains(s.ScientificName.ToLower()));
+                // 0.1 Intentar coincidencia exacta por nombre científico completo dentro del texto
+                var exact = data.FirstOrDefault(s =>
+                    !string.IsNullOrWhiteSpace(s.ScientificName) &&
+                    query.Contains(s.ScientificName.ToLower()));
+
                 if (exact != null)
                 {
                     return new ExpertResult 
@@ -215,6 +219,24 @@ namespace Api.Services
                         Answer = $"Aquí tienes a {exact.ScientificName}.", 
                         Species = new List<Models.AntSpecies> { exact } 
                     };
+                }
+
+                // 0.2 Si no hay coincidencia exacta, intentar sugerencias por similitud (typos)
+                var requested = ExtractPossibleSpeciesName(userQuery);
+                if (!string.IsNullOrWhiteSpace(requested))
+                {
+                    var suggestions = FindSimilarSpecies(requested, data, threshold: 60).Take(5).ToList();
+                    if (suggestions.Any())
+                    {
+                        var lines = suggestions.Select(s => $"- {s.Species.ScientificName} ({s.Similarity:0.0}%)");
+                        return new ExpertResult
+                        {
+                            Answer =
+                                $"No encontré exactamente '{requested}'. ¿Quizás te refieres a alguna de estas especies?\n\n" +
+                                string.Join("\n", lines),
+                            Species = suggestions.Select(s => s.Species).ToList()
+                        };
+                    }
                 }
             }
 
@@ -272,10 +294,128 @@ namespace Api.Services
 
         private List<Models.AntSpecies> FindRelatedSpecies(string query, List<Models.AntSpecies> all)
         {
-            var lower = query.ToLower();
-            // Lógica simple por ahora para no extender demasiado el código
-            return all.Where(s => lower.Contains(s.ScientificName.ToLower()) || lower.Contains(s.ScientificName.Split(' ')[0].ToLower()))
-                      .Take(5).ToList();
+            // Si el usuario escribe mal una especie, intentamos recuperar las más cercanas por similitud.
+            // Esto mejora mucho el UX (typos, acentos, etc.).
+            var requested = ExtractPossibleSpeciesName(query);
+            if (!string.IsNullOrWhiteSpace(requested))
+            {
+                return FindSimilarSpecies(requested, all, threshold: 55)
+                    .Take(5)
+                    .Select(x => x.Species)
+                    .ToList();
+            }
+
+            var lower = query.ToLowerInvariant();
+            return all
+                .Where(s => !string.IsNullOrWhiteSpace(s.ScientificName))
+                .Where(s => lower.Contains(s.ScientificName.ToLowerInvariant()) ||
+                            lower.Contains(s.ScientificName.Split(' ')[0].ToLowerInvariant()))
+                .Take(5)
+                .ToList();
+        }
+
+        private sealed record SimilarSpecies(Models.AntSpecies Species, double Similarity);
+
+        /// <summary>
+        /// Extrae de una frase lo que "parece" un nombre de especie (heurística).
+        /// Ej: "enséñame una myrmecia nigrocincta" -> "myrmecia nigrocincta"
+        /// </summary>
+        private static string ExtractPossibleSpeciesName(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+            var lower = input.ToLowerInvariant();
+
+            // Quitamos signos y normalizamos espacios
+            lower = lower.Replace("¿", " ").Replace("?", " ").Replace("!", " ").Replace(".", " ")
+                         .Replace(",", " ").Replace(":", " ").Replace(";", " ")
+                         .Replace("\n", " ").Replace("\r", " ");
+            lower = NormalizeSpaces(lower);
+
+            // Si hay palabras tipo "muéstrame/enséñame/buscar/ver", tomamos lo que va después
+            var triggers = new[] { "muestrame", "muéstrame", "enseñame", "enséñame", "mostrar", "ver", "buscar", "busca" };
+            foreach (var t in triggers)
+            {
+                var idx = lower.IndexOf(t, StringComparison.Ordinal);
+                if (idx >= 0)
+                {
+                    var tail = lower[(idx + t.Length)..].Trim();
+                    tail = tail.TrimStart(new[] { ' ', 'a', 'u', 'n', 'a' }).Trim(); // heurística rápida
+                    tail = NormalizeSpaces(tail);
+                    var words = tail.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (words.Length >= 2) return $"{words[0]} {words[1]}";
+                    if (words.Length == 1) return words[0];
+                }
+            }
+
+            // Si no, intentamos sacar las dos últimas palabras si parecen "genus species"
+            var parts = lower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+                return $"{parts[^2]} {parts[^1]}";
+            return parts.Length == 1 ? parts[0] : string.Empty;
+        }
+
+        private static string NormalizeSpaces(string s)
+            => string.Join(' ', s.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+        /// <summary>
+        /// Encuentra especies similares por nombre científico usando varias heurísticas.
+        /// Similarity: 0..100.
+        /// </summary>
+        private static IEnumerable<SimilarSpecies> FindSimilarSpecies(string input, IEnumerable<Models.AntSpecies> all, int threshold)
+        {
+            var needle = input.ToLowerInvariant().Trim();
+            if (string.IsNullOrWhiteSpace(needle)) yield break;
+
+            foreach (var s in all)
+            {
+                if (string.IsNullOrWhiteSpace(s.ScientificName)) continue;
+                var hay = s.ScientificName.ToLowerInvariant().Trim();
+
+                // Exact match
+                double exact = hay == needle ? 100 : 0;
+                // Contains (muy útil cuando solo ponen género o parte del epíteto)
+                double contains = (hay.Contains(needle) || needle.Contains(hay)) ? 90 : 0;
+                // Levenshtein similarity
+                double lev = LevenshteinSimilarityPercent(needle, hay);
+
+                var sim = Math.Max(exact, Math.Max(contains, lev));
+                if (sim >= threshold)
+                    yield return new SimilarSpecies(s, sim);
+            }
+        }
+
+        private static double LevenshteinSimilarityPercent(string a, string b)
+        {
+            var dist = ComputeLevenshteinDistance(a, b);
+            var max = Math.Max(a.Length, b.Length);
+            if (max == 0) return 100;
+            return 100.0 * (1.0 - (double)dist / max);
+        }
+
+        private static int ComputeLevenshteinDistance(string source, string target)
+        {
+            if (string.IsNullOrEmpty(source)) return string.IsNullOrEmpty(target) ? 0 : target.Length;
+            if (string.IsNullOrEmpty(target)) return source.Length;
+
+            var n = source.Length;
+            var m = target.Length;
+            var d = new int[n + 1, m + 1];
+
+            for (var i = 0; i <= n; i++) d[i, 0] = i;
+            for (var j = 0; j <= m; j++) d[0, j] = j;
+
+            for (var i = 1; i <= n; i++)
+            {
+                for (var j = 1; j <= m; j++)
+                {
+                    var cost = source[i - 1] == target[j - 1] ? 0 : 1;
+                    d[i, j] = Math.Min(
+                        Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                        d[i - 1, j - 1] + cost);
+                }
+            }
+
+            return d[n, m];
         }
     }
 }
