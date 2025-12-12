@@ -17,6 +17,9 @@ namespace Api.Services
 
         private readonly IRepository<Models.AntSpecies> _repository;
         private readonly IConfiguration _configuration;
+        
+        // Historial de conversación en memoria (durante la vida de la conexión WebSocket)
+        private readonly List<object> _conversationHistory = new();
 
         public McpWebSocketHandler(IRepository<Models.AntSpecies> repository, IConfiguration configuration)
         {
@@ -203,6 +206,10 @@ namespace Api.Services
             var query = userQuery.ToLower().Trim();
             var data = (await _repository.GetAllAsync()).ToList();
 
+            // Añadir mensaje del usuario al historial
+            var userMsgContent = string.IsNullOrEmpty(speciesNameContext) ? userQuery : $"Contexto: {speciesNameContext}. Pregunta: {userQuery}";
+            _conversationHistory.Add(new { role = "user", content = userMsgContent });
+
             // 0) Si el usuario escribe SOLO (o casi solo) un nombre de especie, aplicar también sugerencias por similitud.
             // Ej: "myrmecia nigrocinta" (typo) -> sugerir "Myrmecia nigrocincta".
             if (LooksLikeSpeciesNameOnly(userQuery))
@@ -216,9 +223,11 @@ namespace Api.Services
                         s.ScientificName.Equals(requestedOnly, StringComparison.OrdinalIgnoreCase));
                     if (exactOnly != null)
                     {
+                        var ans = $"Perfecto: {exactOnly.ScientificName}. ¿Qué quieres saber sobre esta especie?";
+                        _conversationHistory.Add(new { role = "assistant", content = ans });
                         return new ExpertResult
                         {
-                            Answer = $"Perfecto: {exactOnly.ScientificName}. ¿Qué quieres saber sobre esta especie?",
+                            Answer = ans,
                             Species = new List<Models.AntSpecies> { exactOnly }
                         };
                     }
@@ -238,17 +247,28 @@ namespace Api.Services
                             var correctedQuery =
                                 $"El usuario escribió '{requestedOnly}' (posible typo). Interpreta que se refiere a '{corrected}'. " +
                                 $"Responde sobre '{corrected}' y da consejos para principiantes si procede.";
-                            var ai = await CallOpenAi(correctedQuery, corrected, data);
+                            // Nota: No añadimos el correctedQuery al historial "visible" para el usuario, 
+                            // pero para OpenAI usaremos el historial modificado o añadimos este prompt.
+                            // Para simplificar, hacemos la llamada a OpenAI y dejamos que él responda.
+                            // CallOpenAi ya usa el historial, pero aquí queremos "engañar" un poco o añadir contexto extra.
+                            // Vamos a añadir un mensaje de sistema temporal o simplemente invocar CallOpenAi con un flag.
+                            
+                            // Mejor opción: Añadir un mensaje de sistema al historial indicando la corrección
+                            _conversationHistory.Add(new { role = "system", content = $"El usuario quiso decir '{corrected}'." });
+                            
+                            var ai = await CallOpenAi(corrected, data); // Pasamos 'corrected' como contexto de nombre si se quiere
                             ai.Species = suggestionsOnly.Select(x => x.Species).ToList();
                             return ai;
                         }
 
                         var lines = suggestionsOnly.Select(s => $"- {s.Species.ScientificName} ({s.Similarity:0.0}%)");
+                        var ans = $"No encontré exactamente '{requestedOnly}'. ¿Quizás te refieres a alguna de estas especies?\n\n" +
+                                string.Join("\n", lines);
+                        
+                        _conversationHistory.Add(new { role = "assistant", content = ans });
                         return new ExpertResult
                         {
-                            Answer =
-                                $"No encontré exactamente '{requestedOnly}'. ¿Quizás te refieres a alguna de estas especies?\n\n" +
-                                string.Join("\n", lines),
+                            Answer = ans,
                             Species = suggestionsOnly.Select(s => s.Species).ToList()
                         };
                     }
@@ -266,9 +286,11 @@ namespace Api.Services
 
                 if (exact != null)
                 {
+                    var ans = $"Aquí tienes a {exact.ScientificName}.";
+                    _conversationHistory.Add(new { role = "assistant", content = ans });
                     return new ExpertResult 
                     { 
-                        Answer = $"Aquí tienes a {exact.ScientificName}.", 
+                        Answer = ans, 
                         Species = new List<Models.AntSpecies> { exact } 
                     };
                 }
@@ -284,11 +306,13 @@ namespace Api.Services
                     if (suggestions.Any())
                     {
                         var lines = suggestions.Select(s => $"- {s.Species.ScientificName} ({s.Similarity:0.0}%)");
+                        var ans = $"No encontré exactamente '{requested}'. ¿Quizás te refieres a alguna de estas especies?\n\n" +
+                                string.Join("\n", lines);
+                        
+                        _conversationHistory.Add(new { role = "assistant", content = ans });
                         return new ExpertResult
                         {
-                            Answer =
-                                $"No encontré exactamente '{requested}'. ¿Quizás te refieres a alguna de estas especies?\n\n" +
-                                string.Join("\n", lines),
+                            Answer = ans,
                             Species = suggestions.Select(s => s.Species).ToList()
                         };
                     }
@@ -296,10 +320,10 @@ namespace Api.Services
             }
 
             // Llamada a OpenAI
-            return await CallOpenAi(userQuery, speciesNameContext, data);
+            return await CallOpenAi(speciesNameContext, data);
         }
 
-        private async Task<ExpertResult> CallOpenAi(string userQuery, string? contextName, List<Models.AntSpecies> allSpecies)
+        private async Task<ExpertResult> CallOpenAi(string? contextName, List<Models.AntSpecies> allSpecies)
         {
             if (string.IsNullOrWhiteSpace(OpenAiKey))
                 return new ExpertResult { Answer = "Error: OPENAI_API_KEY no configurada en el servidor." };
@@ -313,16 +337,21 @@ namespace Api.Services
                 var stats = $"Total especies en BD: {allSpecies.Count}.";
                 
                 var systemPrompt = $"Eres un experto en hormigas. Responde en español. Contexto BD: {stats}. Ejemplos: {string.Join(", ", sampleData)}.";
-                var finalQuery = string.IsNullOrEmpty(contextName) ? userQuery : $"Contexto: {contextName}. Pregunta: {userQuery}";
+                
+                // Construir mensajes incluyendo historial
+                // Limitamos historial a los últimos 10 mensajes para no saturar tokens
+                var messagesToSend = new List<object>
+                {
+                    new { role = "system", content = systemPrompt }
+                };
+                
+                var recentHistory = _conversationHistory.TakeLast(10).ToList();
+                messagesToSend.AddRange(recentHistory);
 
                 var requestBody = new
                 {
                     model = "gpt-3.5-turbo",
-                    messages = new[]
-                    {
-                        new { role = "system", content = systemPrompt },
-                        new { role = "user", content = finalQuery }
-                    },
+                    messages = messagesToSend,
                     max_tokens = 800
                 };
 
@@ -336,8 +365,19 @@ namespace Api.Services
                 using var doc = JsonDocument.Parse(jsonString);
                 var answer = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
 
+                // Guardar respuesta en historial
+                _conversationHistory.Add(new { role = "assistant", content = answer });
+
                 // Lógica de búsqueda borrosa de especies relacionadas
-                var matched = FindRelatedSpecies(userQuery, allSpecies);
+                // Usamos el último userQuery para buscar relacionadas, lo sacamos del historial
+                var lastUserMsg = recentHistory.LastOrDefault(x => GetPropValue(x, "role") == "user");
+                var userQueryText = lastUserMsg != null ? GetPropValue(lastUserMsg, "content") : "";
+                
+                // Limpieza básica del texto de query (quitar "Contexto: ...")
+                if (userQueryText.Contains("Pregunta: ")) 
+                    userQueryText = userQueryText.Split("Pregunta: ").Last();
+
+                var matched = FindRelatedSpecies(userQueryText, allSpecies);
 
                 return new ExpertResult { Answer = answer, Species = matched };
             }
@@ -345,6 +385,12 @@ namespace Api.Services
             {
                 return new ExpertResult { Answer = $"Excepción: {ex.Message}" };
             }
+        }
+
+        private static string GetPropValue(object src, string propName)
+        {
+            try { return (string)src.GetType().GetProperty(propName).GetValue(src, null); }
+            catch { return ""; }
         }
 
         private List<Models.AntSpecies> FindRelatedSpecies(string query, List<Models.AntSpecies> all)
