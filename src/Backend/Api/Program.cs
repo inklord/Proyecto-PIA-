@@ -76,7 +76,7 @@ var connectionString = "Server=localhost;Database=antmaster;Uid=root;Pwd=BFXNH2N
 RepositoryFactory.Initialize(persistenceType, connectionString);
 
 // Registrar servicios para MCP (WebSocket)
-builder.Services.AddSingleton(RepositoryFactory.GetRepository());
+builder.Services.AddSingleton<Persistence.IRepository<global::Models.AntSpecies>>(_ => RepositoryFactory.GetRepository());
 builder.Services.AddTransient<Api.Services.McpWebSocketHandler>();
 
 var app = builder.Build();
@@ -97,9 +97,17 @@ app.Use(async (context, next) =>
     {
         if (context.WebSockets.IsWebSocketRequest)
         {
-            using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            var handler = context.RequestServices.GetRequiredService<Api.Services.McpWebSocketHandler>();
-            await handler.HandleAsync(webSocket);
+            try
+            {
+                using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                var handler = context.RequestServices.GetRequiredService<Api.Services.McpWebSocketHandler>();
+                await handler.HandleAsync(webSocket);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MCP] Error al aceptar/gestionar WebSocket: {ex}");
+                context.Response.StatusCode = 500;
+            }
         }
         else
         {

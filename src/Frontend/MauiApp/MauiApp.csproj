@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <!-- SOLO WINDOWS para evitar instalar gigas de Android/iOS para la defensa -->
-    <TargetFrameworks>net8.0-windows10.0.19041.0</TargetFrameworks>
+    <!-- El repo usa SDK .NET 10; para evitar problemas de referencias MAUI, targeteamos net10.0 en Windows -->
+    <TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
     
     <OutputType>Exe</OutputType>
     <RootNamespace>MauiApp</RootNamespace>
@@ -22,6 +23,18 @@
     <ApplicationVersion>1</ApplicationVersion>
 
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+    <!-- Evita requisitos de MSIX/AppxManifest al compilar en Windows (modo unpackaged) -->
+    <WindowsPackageType>None</WindowsPackageType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Models\Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- .NET 10 MAUI: referencias explícitas a los paquetes (requerido a partir de .NET 8+) -->
+    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.1" />
+  </ItemGroup>
 
 </Project>
