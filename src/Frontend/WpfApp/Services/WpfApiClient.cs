@@ -173,10 +173,8 @@ namespace WpfApp.Services
             {
                 while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
                 {
-                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                    if (result.MessageType == WebSocketMessageType.Close) break;
-
-                    var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    var msg = await ReceiveFullTextMessage(ws, buffer, token);
+                    if (msg == null) break;
                     HandleMessage(msg);
                 }
             }
@@ -184,6 +182,21 @@ namespace WpfApp.Services
             {
                 // Ignorar errores de desconexión
             }
+        }
+
+        private static async Task<string?> ReceiveFullTextMessage(ClientWebSocket ws, byte[] buffer, CancellationToken token)
+        {
+            var sb = new StringBuilder();
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+                if (result.MessageType == WebSocketMessageType.Close) return null;
+                if (result.MessageType != WebSocketMessageType.Text) continue;
+                sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            } while (!result.EndOfMessage);
+
+            return sb.ToString();
         }
 
         private void HandleMessage(string json)

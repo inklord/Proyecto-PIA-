@@ -30,26 +30,19 @@ namespace Api.Services
             {
                 while (webSocket.State == WebSocketState.Open)
                 {
-                    var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        // Si el mensaje es más largo que el buffer, habría que manejar fragmentación, 
-                        // pero para este ejemplo asumimos que cabe.
-                        
-                        var response = await ProcessMessageAsync(message);
-                        
-                        if (response != null)
-                        {
-                            var respJson = JsonSerializer.Serialize(response);
-                            var bytes = Encoding.UTF8.GetBytes(respJson);
-                            await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-                        }
-                    }
-                    else if (result.MessageType == WebSocketMessageType.Close)
+                    var message = await ReceiveFullTextMessage(webSocket, buffer);
+                    if (message == null)
                     {
                         await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Cerrado por el servidor", CancellationToken.None);
+                        break;
+                    }
+
+                    var response = await ProcessMessageAsync(message);
+                    if (response != null)
+                    {
+                        var respJson = JsonSerializer.Serialize(response);
+                        var bytes = Encoding.UTF8.GetBytes(respJson);
+                        await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
                 }
             }
@@ -57,6 +50,21 @@ namespace Api.Services
             {
                 Console.WriteLine($"Error en WebSocket MCP: {ex.Message}");
             }
+        }
+
+        private static async Task<string?> ReceiveFullTextMessage(WebSocket ws, byte[] buffer)
+        {
+            var sb = new StringBuilder();
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                if (result.MessageType == WebSocketMessageType.Close) return null;
+                if (result.MessageType != WebSocketMessageType.Text) continue;
+                sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            } while (!result.EndOfMessage);
+
+            return sb.ToString();
         }
 
         private async Task<JsonRpcResponse> ProcessMessageAsync(string json)
