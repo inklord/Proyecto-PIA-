@@ -203,6 +203,55 @@ namespace Api.Services
             var query = userQuery.ToLower().Trim();
             var data = (await _repository.GetAllAsync()).ToList();
 
+            // 0) Si el usuario escribe SOLO (o casi solo) un nombre de especie, aplicar también sugerencias por similitud.
+            // Ej: "myrmecia nigrocinta" (typo) -> sugerir "Myrmecia nigrocincta".
+            if (LooksLikeSpeciesNameOnly(userQuery))
+            {
+                var requestedOnly = ExtractPossibleSpeciesName(userQuery);
+                if (!string.IsNullOrWhiteSpace(requestedOnly))
+                {
+                    // Si existe exacta, devolvemos sin más
+                    var exactOnly = data.FirstOrDefault(s =>
+                        !string.IsNullOrWhiteSpace(s.ScientificName) &&
+                        s.ScientificName.Equals(requestedOnly, StringComparison.OrdinalIgnoreCase));
+                    if (exactOnly != null)
+                    {
+                        return new ExpertResult
+                        {
+                            Answer = $"Perfecto: {exactOnly.ScientificName}. ¿Qué quieres saber sobre esta especie?",
+                            Species = new List<Models.AntSpecies> { exactOnly }
+                        };
+                    }
+
+                    // Sugerencias por similitud
+                    var suggestionsOnly = FindSimilarSpecies(requestedOnly, data, threshold: 60).Take(5).ToList();
+                    if (suggestionsOnly.Any())
+                    {
+                        // Si la primera es muy alta, asumimos corrección automática y consultamos a OpenAI sobre esa especie.
+                        var top = suggestionsOnly[0];
+                        if (top.Similarity >= 85)
+                        {
+                            var corrected = top.Species.ScientificName;
+                            var correctedQuery =
+                                $"El usuario escribió '{requestedOnly}' (posible typo). Interpreta que se refiere a '{corrected}'. " +
+                                $"Responde sobre '{corrected}' y da consejos para principiantes si procede.";
+                            var ai = await CallOpenAi(correctedQuery, corrected, data);
+                            ai.Species = suggestionsOnly.Select(x => x.Species).ToList();
+                            return ai;
+                        }
+
+                        var lines = suggestionsOnly.Select(s => $"- {s.Species.ScientificName} ({s.Similarity:0.0}%)");
+                        return new ExpertResult
+                        {
+                            Answer =
+                                $"No encontré exactamente '{requestedOnly}'. ¿Quizás te refieres a alguna de estas especies?\n\n" +
+                                string.Join("\n", lines),
+                            Species = suggestionsOnly.Select(s => s.Species).ToList()
+                        };
+                    }
+                }
+            }
+
             // 0) Peticiones directas
             if (query.Contains("muestrame") || query.Contains("muéstrame") || query.Contains("enseñame") || query.Contains("enséñame")
                 || query.Contains("mostrar") || query.Contains("ver ") || query.Contains("busca") || query.Contains("buscar"))
@@ -356,6 +405,32 @@ namespace Api.Services
 
         private static string NormalizeSpaces(string s)
             => string.Join(' ', s.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+        private static bool LooksLikeSpeciesNameOnly(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return false;
+            var trimmed = input.Trim();
+            // Si es una frase muy larga, no la tratamos como "solo nombre"
+            if (trimmed.Length > 50) return false;
+
+            // Normalizar y quitar puntuación típica
+            var lower = trimmed.ToLowerInvariant();
+            foreach (var ch in new[] { '?', '¿', '!', '.', ',', ':', ';', '\n', '\r', '\t' })
+                lower = lower.Replace(ch, ' ');
+            lower = NormalizeSpaces(lower);
+
+            var words = lower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            // Un nombre científico típico tiene 2 palabras, admitimos 1 (solo género) o 3 (incluye subsp.)
+            if (words.Length is < 1 or > 3) return false;
+
+            // Si contiene verbos clave, no es "solo nombre"
+            var triggers = new[] { "muestrame", "muéstrame", "enseñame", "enséñame", "mostrar", "ver", "buscar", "busca", "dame", "quiero" };
+            if (triggers.Any(t => lower.Contains(t))) return false;
+
+            // Heurística: la mayoría de caracteres deben ser letras o espacios (permitimos guion)
+            var lettersOrSpace = lower.Count(c => char.IsLetter(c) || c == ' ' || c == '-');
+            return (double)lettersOrSpace / Math.Max(1, lower.Length) > 0.9;
+        }
 
         /// <summary>
         /// Encuentra especies similares por nombre científico usando varias heurísticas.
