@@ -37,10 +37,12 @@ namespace Api.Services
                         break;
                     }
 
+                    Console.WriteLine($"[MCP] << {message}");
                     var response = await ProcessMessageAsync(message);
                     if (response != null)
                     {
                         var respJson = JsonSerializer.Serialize(response);
+                        Console.WriteLine($"[MCP] >> {respJson}");
                         var bytes = Encoding.UTF8.GetBytes(respJson);
                         await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
@@ -48,7 +50,7 @@ namespace Api.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error en WebSocket MCP: {ex.Message}");
+                Console.WriteLine($"[MCP] Error en WebSocket MCP: {ex}");
             }
         }
 

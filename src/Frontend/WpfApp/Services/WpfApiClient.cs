@@ -247,6 +247,11 @@ namespace WpfApp.Services
                         }
                     }
                 }
+                else
+                {
+                    // Mensaje sin id o id no esperado: útil para depurar timeouts
+                    Console.WriteLine("[MCP-CLIENT] Mensaje sin correlación: " + json);
+                }
             }
             catch (Exception ex)
             {

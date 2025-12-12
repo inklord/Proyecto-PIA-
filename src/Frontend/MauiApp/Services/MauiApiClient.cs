@@ -215,6 +215,10 @@ namespace MauiApp.Services
                         }
                     }
                 }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("[MCP-CLIENT] Mensaje sin correlación: " + json);
+                }
             }
             catch (Exception ex)
             {
