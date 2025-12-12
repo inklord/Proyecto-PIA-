@@ -336,7 +336,14 @@ namespace Api.Services
                 var sampleData = allSpecies.Take(20).Select(x => x.ScientificName).ToList();
                 var stats = $"Total especies en BD: {allSpecies.Count}.";
                 
-                var systemPrompt = $"Eres un experto en hormigas. Responde en español. Contexto BD: {stats}. Ejemplos: {string.Join(", ", sampleData)}.";
+                var systemPrompt = 
+                    $"Eres un experto mirmecólogo (científico especializado en hormigas). Responde en español.\n" +
+                    $"Reglas CRÍTICAS:\n" +
+                    $"1. Prioriza la VERACIDAD. Si no conoces un dato específico (como el tamaño exacto), NO lo inventes. Dilo claramente o da un rango aproximado basado en el GÉNERO.\n" +
+                    $"2. Para comparaciones de tamaño, usa la lógica taxonómica: por ejemplo, 'Myrmecia' (Bull ants) son casi siempre mucho más grandes (15-30mm) que 'Camponotus' (5-15mm) o 'Lasius'.\n" +
+                    $"3. Contexto actual de la BD: {stats}. Ejemplos de nombres válidos: {string.Join(", ", sampleData)}.\n" +
+                    $"4. Si el usuario pregunta por una especie que no está en la BD, responde igualmente con tu conocimiento general científico.\n" +
+                    $"5. Sé preciso. Evita ambigüedades.";
                 
                 // Construir mensajes incluyendo historial
                 // Limitamos historial a los últimos 10 mensajes para no saturar tokens
