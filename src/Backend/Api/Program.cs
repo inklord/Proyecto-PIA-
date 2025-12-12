@@ -75,6 +75,10 @@ var persistenceType = "MySQL";
 var connectionString = "Server=localhost;Database=antmaster;Uid=root;Pwd=BFXNH2Ncj1kh@23;";
 RepositoryFactory.Initialize(persistenceType, connectionString);
 
+// Registrar servicios para MCP (WebSocket)
+builder.Services.AddSingleton(RepositoryFactory.GetRepository());
+builder.Services.AddTransient<Api.Services.McpWebSocketHandler>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -83,6 +87,30 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseWebSockets();
+
+// Middleware para interceptar ruta /mcp y actualizar a WebSocket
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path == "/mcp")
+    {
+        if (context.WebSockets.IsWebSocketRequest)
+        {
+            using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+            var handler = context.RequestServices.GetRequiredService<Api.Services.McpWebSocketHandler>();
+            await handler.HandleAsync(webSocket);
+        }
+        else
+        {
+            context.Response.StatusCode = 400;
+        }
+    }
+    else
+    {
+        await next();
+    }
+});
 
 app.UseHttpsRedirection();
 

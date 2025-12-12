@@ -1,5 +1,9 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Collections.Concurrent;
 using Models;
 
 namespace MauiApp.Services
@@ -8,8 +12,19 @@ namespace MauiApp.Services
     {
         private readonly HttpClient _client;
         private string _token = string.Empty;
+
         // Ajusta IP si usas emulador Android (10.0.2.2) o dispositivo físico
-        private string BaseUrl = DeviceInfo.Platform == DevicePlatform.Android ? "http://10.0.2.2:5000/api" : "http://localhost:5000/api";
+        private string BaseUrl => DeviceInfo.Platform == DevicePlatform.Android 
+            ? "http://10.0.2.2:5000/api" 
+            : "http://localhost:5000/api";
+
+        private string WsUrl => DeviceInfo.Platform == DevicePlatform.Android
+            ? "ws://10.0.2.2:5000/mcp"
+            : "ws://localhost:5000/mcp";
+
+        private ClientWebSocket? _ws;
+        private readonly ConcurrentDictionary<string, TaskCompletionSource<McpResult>> _pendingRequests = new();
+        private CancellationTokenSource? _cts;
 
         public MauiApiClient()
         {
@@ -19,7 +34,9 @@ namespace MauiApp.Services
         public async Task<bool> LoginAsync(string username, string password)
         {
             try {
-                var response = await _client.PostAsJsonAsync($"{BaseUrl}/auth/login", new LoginRequest { Username = username, Password = password });
+                // En AuthDtos.cs LoginRequest usa Email/Password, pero aquí se llama username.
+                // Asumimos que el backend mapea o que el usuario mete email en campo username.
+                var response = await _client.PostAsJsonAsync($"{BaseUrl}/auth/login", new LoginRequest { Email = username, Password = password });
                 if (response.IsSuccessStatusCode)
                 {
                     var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
@@ -43,12 +60,153 @@ namespace MauiApp.Services
             } catch { return new List<AntSpecies>(); }
         }
 
+        public class McpResult
+        {
+            public string Answer { get; set; } = string.Empty;
+            public List<AntSpecies> Species { get; set; } = new();
+        }
+
+        // --- LÓGICA WEBSOCKET MCP (JSON-RPC) ---
+
         public async Task<string> QueryMcpAsync(string query)
         {
-             try {
-                 var response = await _client.PostAsJsonAsync($"{BaseUrl}/mcp/query", new { Query = query });
-                 return await response.Content.ReadAsStringAsync();
-             } catch { return "Error"; }
+            try
+            {
+                await EnsureConnected();
+
+                var requestId = Guid.NewGuid().ToString();
+                var tcs = new TaskCompletionSource<McpResult>();
+                _pendingRequests.TryAdd(requestId, tcs);
+
+                // Construimos petición JSON-RPC tools/call
+                var request = new
+                {
+                    jsonrpc = "2.0",
+                    id = requestId,
+                    method = "tools/call",
+                    @params = new
+                    {
+                        name = "ask_expert",
+                        arguments = new
+                        {
+                            query = query
+                        }
+                    }
+                };
+
+                var json = JsonSerializer.Serialize(request);
+                var bytes = Encoding.UTF8.GetBytes(json);
+                
+                if (_ws != null && _ws.State == WebSocketState.Open)
+                {
+                    await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+                else
+                {
+                    return "Error: Conexión WebSocket cerrada.";
+                }
+
+                // Esperar respuesta (con timeout de 30s)
+                var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(30000));
+                if (completedTask == tcs.Task)
+                {
+                    var result = await tcs.Task;
+                    return result.Answer; // MAUI solo muestra el texto en la versión simple
+                }
+                else
+                {
+                    _pendingRequests.TryRemove(requestId, out _);
+                    return "Error: Timeout esperando al experto.";
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Error interno MCP: {ex.Message}";
+            }
+        }
+
+        private async Task EnsureConnected()
+        {
+            if (_ws != null && _ws.State == WebSocketState.Open) return;
+
+            _ws = new ClientWebSocket();
+            _cts = new CancellationTokenSource();
+            try
+            {
+                await _ws.ConnectAsync(new Uri(WsUrl), _cts.Token);
+                _ = Task.Run(() => ListenLoop(_ws, _cts.Token));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error WS Connect: {ex.Message}");
+            }
+        }
+
+        private async Task ListenLoop(ClientWebSocket ws, CancellationToken token)
+        {
+            var buffer = new byte[1024 * 8];
+            try
+            {
+                while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
+                {
+                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+                    if (result.MessageType == WebSocketMessageType.Close) break;
+
+                    var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    HandleMessage(msg);
+                }
+            }
+            catch
+            {
+                // Ignorar errores de desconexión
+            }
+        }
+
+        private void HandleMessage(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                
+                string? id = null;
+                if (root.TryGetProperty("id", out var idProp)) 
+                {
+                    if (idProp.ValueKind == JsonValueKind.String) id = idProp.GetString();
+                    else if (idProp.ValueKind == JsonValueKind.Number) id = idProp.ToString();
+                }
+
+                if (id != null && _pendingRequests.TryRemove(id, out var tcs))
+                {
+                    if (root.TryGetProperty("error", out var errProp))
+                    {
+                         var errMsg = errProp.GetProperty("message").GetString();
+                         tcs.SetResult(new McpResult { Answer = $"Error del Servidor: {errMsg}" });
+                    }
+                    else if (root.TryGetProperty("result", out var resProp))
+                    {
+                        if (resProp.TryGetProperty("content", out var contentProp) && contentProp.GetArrayLength() > 0)
+                        {
+                            var textBlock = contentProp[0];
+                            var innerJson = textBlock.GetProperty("text").GetString();
+
+                            if (!string.IsNullOrEmpty(innerJson))
+                            {
+                                var finalResult = JsonSerializer.Deserialize<McpResult>(innerJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                tcs.SetResult(finalResult ?? new McpResult { Answer = "Respuesta vacía." });
+                            }
+                            else
+                            {
+                                tcs.SetResult(new McpResult { Answer = "Contenido vacío." });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error parsing WS msg: " + ex.Message);
+            }
         }
     }
 }

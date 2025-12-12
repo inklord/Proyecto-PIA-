@@ -3,10 +3,13 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Windows;
-using Models = global::Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Text.Json;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
+using System.Collections.Concurrent;
 
 namespace WpfApp.Services
 {
@@ -14,7 +17,13 @@ namespace WpfApp.Services
     {
         private readonly HttpClient _client;
         private string _token = string.Empty;
-        private const string BaseUrl = "http://localhost:5000/api"; 
+        // Cambia localhost:5000 por tu puerto real si es diferente
+        private const string BaseUrl = "http://localhost:5000/api";
+        private const string WsUrl = "ws://localhost:5000/mcp"; 
+
+        private ClientWebSocket? _ws;
+        private readonly ConcurrentDictionary<string, TaskCompletionSource<McpResult>> _pendingRequests = new();
+        private CancellationTokenSource? _cts;
 
         public WpfApiClient()
         {
@@ -77,50 +86,158 @@ namespace WpfApp.Services
             public List<global::Models.AntSpecies> Species { get; set; } = new();
         }
 
+        // --- LÓGICA WEBSOCKET MCP (JSON-RPC) ---
+
         public async Task<McpResult> QueryMcpAsync(string query, global::Models.AntSpecies? currentSpecies = null)
         {
             try
             {
-                var payload = new
+                await EnsureConnected();
+
+                var requestId = Guid.NewGuid().ToString();
+                var tcs = new TaskCompletionSource<McpResult>();
+                _pendingRequests.TryAdd(requestId, tcs);
+
+                // Construimos petición JSON-RPC tools/call
+                var request = new
                 {
-                    Query = query,
-                    SpeciesName = currentSpecies?.ScientificName
+                    jsonrpc = "2.0",
+                    id = requestId,
+                    method = "tools/call",
+                    @params = new
+                    {
+                        name = "ask_expert",
+                        arguments = new
+                        {
+                            query = query,
+                            speciesContext = currentSpecies?.ScientificName
+                        }
+                    }
                 };
 
-                var response = await _client.PostAsJsonAsync($"{BaseUrl}/mcp/query", payload);
-                var json = await response.Content.ReadAsStringAsync();
-
-                var result = new McpResult();
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                // Aceptamos tanto 'Answer' como 'answer' por si el backend estuviera en otra convención
-                if (root.TryGetProperty("Answer", out var answerProp) ||
-                    root.TryGetProperty("answer", out answerProp))
-                    result.Answer = answerProp.GetString() ?? string.Empty;
-
-                var options = new JsonSerializerOptions
+                var json = JsonSerializer.Serialize(request);
+                var bytes = Encoding.UTF8.GetBytes(json);
+                
+                if (_ws != null && _ws.State == WebSocketState.Open)
                 {
-                    PropertyNameCaseInsensitive = true
-                };
-
-                // Podemos recibir 'Species' o 'Data' según el tipo de consulta
-                if (root.TryGetProperty("Species", out var speciesProp) ||
-                    root.TryGetProperty("species", out speciesProp))
-                {
-                    result.Species = JsonSerializer.Deserialize<List<global::Models.AntSpecies>>(speciesProp.GetRawText(), options) ?? new List<global::Models.AntSpecies>();
+                    await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
                 }
-                else if (root.TryGetProperty("Data", out var dataProp) ||
-                         root.TryGetProperty("data", out dataProp))
+                else
                 {
-                    result.Species = JsonSerializer.Deserialize<List<global::Models.AntSpecies>>(dataProp.GetRawText(), options) ?? new List<global::Models.AntSpecies>();
+                    return new McpResult { Answer = "Error: Conexión WebSocket cerrada." };
                 }
 
-                return result;
+                // Esperar respuesta (con timeout de 30s)
+                var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(30000));
+                if (completedTask == tcs.Task)
+                {
+                    return await tcs.Task;
+                }
+                else
+                {
+                    _pendingRequests.TryRemove(requestId, out _);
+                    return new McpResult { Answer = "Error: Timeout esperando al experto." };
+                }
             }
             catch (Exception ex)
             {
-                return new McpResult { Answer = $"Error de conexión con MCP: {ex.Message}" };
+                return new McpResult { Answer = $"Error interno MCP: {ex.Message}" };
+            }
+        }
+
+        private async Task EnsureConnected()
+        {
+            if (_ws != null && _ws.State == WebSocketState.Open) return;
+
+            _ws = new ClientWebSocket();
+            _cts = new CancellationTokenSource();
+            try
+            {
+                await _ws.ConnectAsync(new Uri(WsUrl), _cts.Token);
+                // Iniciar bucle de escucha
+                _ = Task.Run(() => ListenLoop(_ws, _cts.Token));
+                
+                // Opcional: Enviar initialize (según protocolo MCP)
+                // Pero para simplificar pasamos directo a tools/call
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo conectar al servidor MCP ({WsUrl}): {ex.Message}");
+            }
+        }
+
+        private async Task ListenLoop(ClientWebSocket ws, CancellationToken token)
+        {
+            var buffer = new byte[1024 * 8];
+            try
+            {
+                while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
+                {
+                    var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+                    if (result.MessageType == WebSocketMessageType.Close) break;
+
+                    var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    HandleMessage(msg);
+                }
+            }
+            catch
+            {
+                // Ignorar errores de desconexión
+            }
+        }
+
+        private void HandleMessage(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                
+                // Verificar ID
+                string? id = null;
+                if (root.TryGetProperty("id", out var idProp)) 
+                {
+                    if (idProp.ValueKind == JsonValueKind.String) id = idProp.GetString();
+                    else if (idProp.ValueKind == JsonValueKind.Number) id = idProp.ToString();
+                }
+
+                if (id != null && _pendingRequests.TryRemove(id, out var tcs))
+                {
+                    // Es una respuesta a nuestra petición
+                    if (root.TryGetProperty("error", out var errProp))
+                    {
+                         var errMsg = errProp.GetProperty("message").GetString();
+                         tcs.SetResult(new McpResult { Answer = $"Error del Servidor: {errMsg}" });
+                    }
+                    else if (root.TryGetProperty("result", out var resProp))
+                    {
+                        // En MCP la respuesta de una tool viene en result.content[0].text
+                        // El servidor nos envía el JSON serializado ahí dentro.
+                        if (resProp.TryGetProperty("content", out var contentProp) && contentProp.GetArrayLength() > 0)
+                        {
+                            var textBlock = contentProp[0];
+                            var innerJson = textBlock.GetProperty("text").GetString();
+
+                            if (!string.IsNullOrEmpty(innerJson))
+                            {
+                                var finalResult = JsonSerializer.Deserialize<McpResult>(innerJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                tcs.SetResult(finalResult ?? new McpResult { Answer = "Respuesta vacía." });
+                            }
+                            else
+                            {
+                                tcs.SetResult(new McpResult { Answer = "Contenido vacío." });
+                            }
+                        }
+                        else
+                        {
+                             tcs.SetResult(new McpResult { Answer = "Formato de respuesta desconocido." });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error parsing WS msg: " + ex.Message);
             }
         }
 
@@ -129,7 +246,6 @@ namespace WpfApp.Services
             await _client.DeleteAsync($"{BaseUrl}/species/{id}");
         }
 
-        // Obtener descripción (species_descriptions)
         public async Task<string?> GetDescriptionAsync(int speciesId)
         {
             try
@@ -139,10 +255,7 @@ namespace WpfApp.Services
                 var json = await resp.Content.ReadFromJsonAsync<DescriptionDto>();
                 return json?.Description;
             }
-            catch
-            {
-                return null;
-            }
+            catch { return null; }
         }
 
         private class DescriptionDto

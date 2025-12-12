@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="../src/Backend/Api/Api.csproj" />
+  <Project Path="../src/Backend/Persistence/Persistence.csproj" />
+  <Project Path="../src/Frontend/ConsoleApp/ConsoleApp.csproj" />
+  <Project Path="../src/Frontend/MauiApp/MauiApp.csproj" />
+  <Project Path="../src/Frontend/WpfApp/WpfApp.csproj" />
+  <Project Path="../src/Shared/Models/Models.csproj" />
+</Solution>
