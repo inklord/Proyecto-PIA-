@@ -183,7 +183,7 @@ namespace MauiApp.Services
                 var root = doc.RootElement;
                 
                 string? id = null;
-                if (root.TryGetProperty("id", out var idProp)) 
+                if (root.TryGetProperty("id", out var idProp) || root.TryGetProperty("Id", out idProp)) 
                 {
                     if (idProp.ValueKind == JsonValueKind.String) id = idProp.GetString();
                     else if (idProp.ValueKind == JsonValueKind.Number) id = idProp.ToString();
@@ -191,17 +191,19 @@ namespace MauiApp.Services
 
                 if (id != null && _pendingRequests.TryRemove(id, out var tcs))
                 {
-                    if (root.TryGetProperty("error", out var errProp))
+                    if (root.TryGetProperty("error", out var errProp) || root.TryGetProperty("Error", out errProp))
                     {
                          var errMsg = errProp.GetProperty("message").GetString();
                          tcs.SetResult(new McpResult { Answer = $"Error del Servidor: {errMsg}" });
                     }
-                    else if (root.TryGetProperty("result", out var resProp))
+                    else if (root.TryGetProperty("result", out var resProp) || root.TryGetProperty("Result", out resProp))
                     {
-                        if (resProp.TryGetProperty("content", out var contentProp) && contentProp.GetArrayLength() > 0)
+                        if ((resProp.TryGetProperty("content", out var contentProp) || resProp.TryGetProperty("Content", out contentProp)) && contentProp.GetArrayLength() > 0)
                         {
                             var textBlock = contentProp[0];
-                            var innerJson = textBlock.GetProperty("text").GetString();
+                            var innerJson = (textBlock.TryGetProperty("text", out var textProp) || textBlock.TryGetProperty("Text", out textProp))
+                                ? textProp.GetString()
+                                : null;
 
                             if (!string.IsNullOrEmpty(innerJson))
                             {

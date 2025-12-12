@@ -8,6 +8,11 @@ namespace Api.Services
 {
     public class McpWebSocketHandler
     {
+        private static readonly JsonSerializerOptions RpcJsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
         private readonly IRepository<Models.AntSpecies> _repository;
         private readonly IConfiguration _configuration;
 
@@ -41,7 +46,7 @@ namespace Api.Services
                     var response = await ProcessMessageAsync(message);
                     if (response != null)
                     {
-                        var respJson = JsonSerializer.Serialize(response);
+                        var respJson = JsonSerializer.Serialize(response, RpcJsonOptions);
                         Console.WriteLine($"[MCP] >> {respJson}");
                         var bytes = Encoding.UTF8.GetBytes(respJson);
                         await webSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
