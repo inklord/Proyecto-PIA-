@@ -68,6 +68,19 @@ Este proyecto permite la gestión y consulta de información mirmecológica (hor
    - Prueba el chat "Comunidad (IA)" preguntando por especies cargadas o generales.
 2. **MAUI**: Selecciona el framework de destino (Android Emulator o Windows Machine) y ejecuta.
 
+### 🤖 Ejecución en Android (Emulador)
+El proyecto MAUI está preconfigurado para funcionar en el Emulador de Android de Visual Studio / Android Studio.
+
+**Configuración automática incluida:**
+- **Dirección IP**: La app detecta si corre en Android y cambia `localhost` por **`10.0.2.2`** (el alias del host en el emulador).
+- **Tráfico HTTP**: Se ha habilitado `usesCleartextTraffic="true"` en el manifiesto para permitir conectar con la API local sin HTTPS.
+
+**Pasos:**
+1. Asegúrate de que la API (`src/Backend/Api`) esté corriendo en tu PC.
+2. En Visual Studio, selecciona el proyecto de inicio `MauiApp`.
+3. En el selector de dispositivo, elige un emulador (ej: "Pixel 5 - API 33").
+4. Dale a ejecutar. La app conectará automáticamente con tu servidor local.
+
 ## 🧠 Capacidades del Asistente MCP
 
 El asistente no solo responde preguntas generales, sino que está conectado a los datos de la aplicación.
