@@ -1,6 +1,7 @@
-# Proyecto PIA - Sistema Distribuido .NET con IA (MCP)
+# Proyecto PIA - Sistema Distribuido .NET con IA (MCP) video explicativo https://youtu.be/EEmhqRv48u4
 
 Solución completa en **.NET 8** que implementa una arquitectura distribuida moderna, integrando servicios de IA mediante el protocolo **MCP (Model Context Protocol)** sobre WebSockets.
+
 
 ## 🚀 Características Principales
 
