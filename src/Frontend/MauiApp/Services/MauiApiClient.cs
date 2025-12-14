@@ -13,14 +13,32 @@ namespace MauiApp.Services
         private readonly HttpClient _client;
         private string _token = string.Empty;
 
-        // Ajusta IP si usas emulador Android (10.0.2.2) o dispositivo físico
-        private string BaseUrl => DeviceInfo.Platform == DevicePlatform.Android 
-            ? "http://10.0.2.2:5000/api" 
-            : "http://localhost:5000/api";
+        // --- CONFIGURACIÓN NGROK (Cambiar a false para desarrollo local) ---
+        private const bool UseNgrok = true;
+        private const string NgrokUrl = "https://nonprocessional-lajuana-too.ngrok-free.dev"; // URL de tu captura
 
-        private string WsUrl => DeviceInfo.Platform == DevicePlatform.Android
-            ? "ws://10.0.2.2:5000/mcp"
-            : "ws://localhost:5000/mcp";
+        // Ajusta IP si usas emulador Android (10.0.2.2) o dispositivo físico
+        private string BaseUrl
+        {
+            get
+            {
+                if (UseNgrok) return $"{NgrokUrl}/api";
+                return DeviceInfo.Platform == DevicePlatform.Android 
+                    ? "http://10.0.2.2:5000/api" 
+                    : "http://localhost:5000/api";
+            }
+        }
+
+        private string WsUrl 
+        {
+            get
+            {
+                if (UseNgrok) return $"{NgrokUrl.Replace("http", "ws")}/mcp";
+                return DeviceInfo.Platform == DevicePlatform.Android
+                    ? "ws://10.0.2.2:5000/mcp"
+                    : "ws://localhost:5000/mcp";
+            }
+        }
 
         private ClientWebSocket? _ws;
         private readonly ConcurrentDictionary<string, TaskCompletionSource<McpResult>> _pendingRequests = new();
