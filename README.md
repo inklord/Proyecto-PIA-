@@ -16,9 +16,9 @@ Solución completa en **.NET 8** que implementa una arquitectura distribuida mod
   - **Modo SQL**: Soporte completo para MySQL mediante configuración.
 
 ### Frontend
-- **WPF (Desktop)**: Interfaz moderna con navegación controlada y Chat IA.
-- **MAUI (Multiplataforma)**: App móvil (Android/Windows) con cliente WebSocket robusto.
-- **Consola**: Herramienta administrativa para carga de datos.
+- **WPF (Desktop)**: Interfaz moderna con Chat IA y gestión CRUD completa de especies.
+- **MAUI (Multiplataforma)**: App móvil con cliente WebSocket y gestión de datos.
+- **Consola**: Herramienta administrativa para gestión rápida de usuarios y especies.
 
 ## 🛠️ Configuración y Ejecución
 
@@ -31,7 +31,6 @@ Solución completa en **.NET 8** que implementa una arquitectura distribuida mod
 Por defecto, el proyecto está configurado en **MODO MEMORIA**.
 1. Abre `src/Backend/Api` y ejecuta el proyecto.
 2. La API arrancará en `http://localhost:5000`.
-3. **¿Datos?**: Al ser memoria, la base de datos inicia vacía. Ve al paso 2 para cargar datos de prueba.
 
 > **¿Quieres usar MySQL real?**
 > 1. Ejecuta el script `database_setup.sql` en tu servidor MySQL.
@@ -39,12 +38,10 @@ Por defecto, el proyecto está configurado en **MODO MEMORIA**.
 > 3. Cambia `"Type": "Memory"` por `"Type": "MySQL"`.
 > 4. Ajusta la `ConnectionString` con tu contraseña.
 
-### 2. Cargar Datos (Cliente Consola)
-Como la base de datos empieza vacía:
+### 2. Gestión de Datos (Consola)
 1. Ejecuta `src/Frontend/ConsoleApp`.
 2. Login: `admin` / `admin`.
-3. Elige la **Opción 1** ("Cargar especies de prueba").
-4. ¡Listo! Ahora la API tiene datos para mostrar en WPF/MAUI y para que la IA responda.
+3. Usa el menú para crear usuarios o añadir especies manualmente.
 
 ### 3. Clientes Gráficos (WPF / MAUI)
 *   **WPF**: Ejecuta `WpfApp`. Login con `admin` / `admin`.

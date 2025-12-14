@@ -20,6 +20,7 @@ namespace WpfApp
         {
             BtnExplora.Visibility = Visibility.Visible;
             BtnComunidad.Visibility = Visibility.Visible;
+            BtnAdmin.Visibility = Visibility.Visible;
             BtnSalir.Visibility = Visibility.Visible;
             BtnIngresar.Visibility = Visibility.Collapsed;
             
@@ -32,6 +33,7 @@ namespace WpfApp
             ApiClient.Token = null; // Borrar token si hubiera
             BtnExplora.Visibility = Visibility.Collapsed;
             BtnComunidad.Visibility = Visibility.Collapsed;
+            BtnAdmin.Visibility = Visibility.Collapsed;
             BtnSalir.Visibility = Visibility.Collapsed;
             BtnIngresar.Visibility = Visibility.Visible;
             
@@ -42,6 +44,7 @@ namespace WpfApp
         private void Nav_Login(object sender, RoutedEventArgs e) => MainFrame.Navigate(new LoginView());
         private void Nav_Master(object sender, RoutedEventArgs e) => MainFrame.Navigate(new MasterView());
         private void Nav_Mcp(object sender, RoutedEventArgs e) => MainFrame.Navigate(new McpView());
+        private void Nav_Admin(object sender, RoutedEventArgs e) => MainFrame.Navigate(new AdminView());
         private void Logo_Click(object sender, MouseButtonEventArgs e)
         {
              if (BtnExplora.Visibility == Visibility.Visible)

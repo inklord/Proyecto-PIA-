@@ -33,16 +33,21 @@ namespace ConsoleApp
             return false;
         }
 
-        public async Task UploadBatchAsync(List<AntSpecies> data)
+        public async Task<bool> RegisterAsync(string email, string password)
         {
-            var response = await _client.PostAsJsonAsync($"{BaseUrl}/species/batch", data); // Endpoint cambiado
-            if (response.IsSuccessStatusCode) Console.WriteLine("Carga masiva de hormigas completada.");
-            else Console.WriteLine($"Error en carga: {response.StatusCode}");
+            var response = await _client.PostAsJsonAsync($"{BaseUrl}/auth/register", new LoginRequest { Email = email, Password = password });
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Usuario registrado correctamente.");
+                return true;
+            }
+            Console.WriteLine($"Error al registrar: {response.StatusCode}");
+            return false;
         }
 
         public async Task<List<AntSpecies>> GetAllAsync()
         {
-            return await _client.GetFromJsonAsync<List<AntSpecies>>($"{BaseUrl}/species") ?? new List<AntSpecies>(); // Endpoint cambiado
+            return await _client.GetFromJsonAsync<List<AntSpecies>>($"{BaseUrl}/species") ?? new List<AntSpecies>();
         }
 
         public async Task DeleteAsync(int id)
@@ -51,11 +56,32 @@ namespace ConsoleApp
             Console.WriteLine(response.IsSuccessStatusCode ? "Eliminado." : "Error al eliminar.");
         }
 
+        public async Task CreateAsync(AntSpecies species)
+        {
+            var response = await _client.PostAsJsonAsync($"{BaseUrl}/species", species);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Creado correctamente.");
+            }
+            else
+            {
+                // Leer el error del servidor (que ahora incluye la excepción SQL)
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error al crear ({response.StatusCode}): {errorMsg}");
+            }
+        }
+
+        public async Task UpdateAsync(AntSpecies species)
+        {
+            var response = await _client.PutAsJsonAsync($"{BaseUrl}/species", species);
+            Console.WriteLine(response.IsSuccessStatusCode ? "Actualizado correctamente." : $"Error al actualizar: {response.StatusCode}");
+        }
+
         public async Task<string> QueryMcpAsync(string query)
         {
-             var response = await _client.PostAsJsonAsync($"{BaseUrl}/mcp/query", new { Query = query });
-             var content = await response.Content.ReadAsStringAsync();
-             return content;
+             // La consola usa la versión simplificada, aquí podríamos implementar WS si fuera necesario
+             // Por ahora devolvemos un mensaje de que use WPF/MAUI para el chat avanzado
+             return await Task.FromResult("El chat por consola está deshabilitado. Usa WPF o MAUI para hablar con la IA.");
         }
     }
 }

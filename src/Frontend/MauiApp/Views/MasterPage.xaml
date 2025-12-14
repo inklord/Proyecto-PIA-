@@ -3,28 +3,47 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MauiApp.Views.MasterPage"
              Title="Especies de Hormigas">
+    
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="+" Clicked="OnAddClicked" Order="Primary" Priority="0" />
+    </ContentPage.ToolbarItems>
+
     <Grid RowDefinitions="Auto,*">
         <Button Text="Recargar Especies" Clicked="BtnLoad_Clicked" Margin="10" />
         
-        <CollectionView x:Name="CollView" Grid.Row="1">
+        <CollectionView x:Name="CollView" Grid.Row="1" SelectionMode="None">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Frame Margin="10" Padding="10" BorderColor="Gray" CornerRadius="5">
-                        <Grid ColumnDefinitions="80, *" ColumnSpacing="10">
-                            <!-- Imagen con Fallback si no hay URL -->
-                            <Image Grid.Column="0" 
-                                   Source="{Binding PhotoUrl}" 
-                                   Aspect="AspectFill" 
-                                   HeightRequest="80" 
-                                   WidthRequest="80"
-                                   BackgroundColor="LightGray"/>
-                            
-                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                                <Label Text="{Binding ScientificName}" FontAttributes="Bold" FontSize="18" />
-                                <Label Text="{Binding AntWikiUrl}" FontSize="Micro" TextColor="Blue" LineBreakMode="TailTruncation" />
-                            </VerticalStackLayout>
-                        </Grid>
-                    </Frame>
+                    <SwipeView>
+                        <SwipeView.RightItems>
+                            <SwipeItems>
+                                <SwipeItem Text="Borrar" 
+                                           BackgroundColor="Red" 
+                                           Invoked="OnDeleteInvoked"
+                                           CommandParameter="{Binding .}" />
+                            </SwipeItems>
+                        </SwipeView.RightItems>
+                        
+                        <Frame Margin="10" Padding="10" BorderColor="Gray" CornerRadius="5">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnItemTapped" CommandParameter="{Binding .}"/>
+                            </Frame.GestureRecognizers>
+                            <Grid ColumnDefinitions="80, *" ColumnSpacing="10">
+                                <!-- Imagen con Fallback si no hay URL -->
+                                <Image Grid.Column="0" 
+                                       Source="{Binding PhotoUrl}" 
+                                       Aspect="AspectFill" 
+                                       HeightRequest="80" 
+                                       WidthRequest="80"
+                                       BackgroundColor="LightGray"/>
+                                
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="{Binding ScientificName}" FontAttributes="Bold" FontSize="18" />
+                                    <Label Text="{Binding AntWikiUrl}" FontSize="Micro" TextColor="Blue" LineBreakMode="TailTruncation" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Frame>
+                    </SwipeView>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>

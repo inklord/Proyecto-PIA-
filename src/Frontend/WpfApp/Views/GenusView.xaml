@@ -26,8 +26,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <!-- Tarjeta de Especie -->
-                        <Border Background="White" Margin="10" CornerRadius="3" Width="220" Height="280"
-                                MouseLeftButtonUp="SpeciesCard_Click" Cursor="Hand">
+                        <Border Background="White" Margin="10" CornerRadius="3" Width="220" Height="320">
                             <Border.Effect>
                                 <DropShadowEffect BlurRadius="8" ShadowDepth="2" Direction="270" Color="#DDDDDD" Opacity="0.5"/>
                             </Border.Effect>
@@ -36,17 +35,23 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="180"/>
                                     <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 
-                                <Border CornerRadius="3,3,0,0" ClipToBounds="True">
+                                <Border CornerRadius="3,3,0,0" ClipToBounds="True" MouseLeftButtonUp="SpeciesCard_Click" Cursor="Hand">
                                     <Image Source="{Binding PhotoUrl}" Stretch="UniformToFill"/>
                                 </Border>
                                 
-                                <StackPanel Grid.Row="1" Margin="12">
+                                <StackPanel Grid.Row="1" Margin="12,12,12,0">
                                     <TextBlock Text="{Binding ScientificName}" FontWeight="Bold" FontStyle="Italic"
                                                FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
-                                    <TextBlock Text="Ver en AntWiki" Margin="0,5,0,0"
+                                    <TextBlock Text="Ver en AntWiki" Margin="0,5,0,0" MouseLeftButtonUp="SpeciesCard_Click"
                                                Foreground="{StaticResource InatGreenBrush}" FontSize="12" Cursor="Hand"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
+                                    <Button Content="Editar" Tag="{Binding}" Click="BtnEdit_Click" Margin="0,0,5,0" Padding="5,2" Background="#007ACC" Foreground="White" BorderThickness="0"/>
+                                    <Button Content="Borrar" Tag="{Binding}" Click="BtnDelete_Click" Padding="5,2" Background="#DC3545" Foreground="White" BorderThickness="0"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

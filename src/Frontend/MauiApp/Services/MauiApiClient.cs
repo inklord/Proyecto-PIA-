@@ -78,6 +78,46 @@ namespace MauiApp.Services
             } catch { return new List<AntSpecies>(); }
         }
 
+        public async Task CreateAsync(AntSpecies species)
+        {
+            try
+            {
+                var response = await _client.PostAsJsonAsync($"{BaseUrl}/species", species);
+                if (!response.IsSuccessStatusCode)
+                    System.Diagnostics.Debug.WriteLine($"Error Create: {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error Create: {ex.Message}");
+            }
+        }
+
+        public async Task UpdateAsync(AntSpecies species)
+        {
+            try
+            {
+                var response = await _client.PutAsJsonAsync($"{BaseUrl}/species", species);
+                if (!response.IsSuccessStatusCode)
+                    System.Diagnostics.Debug.WriteLine($"Error Update: {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error Update: {ex.Message}");
+            }
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            try
+            {
+                await _client.DeleteAsync($"{BaseUrl}/species/{id}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error Delete: {ex.Message}");
+            }
+        }
+
         public class McpResult
         {
             public string Answer { get; set; } = string.Empty;

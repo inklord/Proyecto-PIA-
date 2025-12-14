@@ -278,6 +278,36 @@ namespace WpfApp.Services
             }
         }
 
+        public async Task<bool> CreateAsync(global::Models.AntSpecies species)
+        {
+            try
+            {
+                var response = await _client.PostAsJsonAsync($"{BaseUrl}/species", species);
+                if (response.IsSuccessStatusCode) return true;
+                MessageBox.Show($"Error al crear: {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error de conexión: {ex.Message}");
+            }
+            return false;
+        }
+
+        public async Task<bool> UpdateAsync(global::Models.AntSpecies species)
+        {
+            try
+            {
+                var response = await _client.PutAsJsonAsync($"{BaseUrl}/species", species);
+                if (response.IsSuccessStatusCode) return true;
+                MessageBox.Show($"Error al actualizar: {response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error de conexión: {ex.Message}");
+            }
+            return false;
+        }
+
         public async Task DeleteAsync(int id)
         {
             await _client.DeleteAsync($"{BaseUrl}/species/{id}");

@@ -9,6 +9,7 @@ namespace Models
         public string? AntWikiUrl { get; set; }
         public string? PhotoUrl { get; set; }
         public string? InaturalistId { get; set; }
+        public string? Description { get; set; }
 
         public override string ToString()
         {
