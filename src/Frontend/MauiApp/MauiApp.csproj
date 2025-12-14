@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- SOLO WINDOWS para evitar instalar gigas de Android/iOS para la defensa -->
     <!-- El repo usa SDK .NET 10; para evitar problemas de referencias MAUI, targeteamos net10.0 en Windows -->
-    <TargetFrameworks>net10.0-android;net10.0-windows10.0.19041.0</TargetFrameworks>
+    <TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
     
     <OutputType>Exe</OutputType>
     <RootNamespace>MauiApp</RootNamespace>
